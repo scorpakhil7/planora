@@ -1,0 +1,136 @@
+Refactor the existing backend structure of the Planora project with the following constraints:
+
+⚠️ CRITICAL RULES:
+
+* Do NOT recreate the project
+* Do NOT duplicate files
+* Do NOT overwrite working logic
+* Only extend and refactor existing structure
+* Maintain current folder hierarchy
+
+---
+
+# 1. ADD SERVICE LAYER (MANDATORY)
+
+Create a new folder:
+
+backend/app/services/
+
+Add the following files with clean, minimal class scaffolding:
+
+* user_service.py
+* trip_service.py
+* booking_service.py
+* budget_service.py
+* ai_service.py
+
+Each service should:
+
+* Be a class-based structure
+* Contain placeholder methods (no heavy logic yet)
+* Follow dependency injection readiness
+
+---
+
+# 2. DECOUPLE AI ROUTES FROM PLANNER
+
+Refactor:
+
+backend/app/api/routes/ai.py
+
+Changes:
+
+* Routes must NOT directly call planner.py
+* Instead call ai_service.py
+
+Flow must be:
+Route → AI Service → Planner
+
+Update imports accordingly.
+
+---
+
+# 3. ADD MOCK INTEGRATION ADAPTERS
+
+Inside:
+
+backend/app/integrations/
+
+Add the following files:
+
+* irctc.py
+* redbus.py
+* flights.py
+* hotels.py
+
+Each adapter should:
+
+* Extend BaseAdapter
+* Implement:
+
+  * search()
+  * book()
+  * cancel()
+
+Return mock/dummy structured data (realistic format).
+
+Register all adapters inside registry.py.
+
+---
+
+# 4. STANDARDIZE API RESPONSES
+
+Create a response utility:
+
+backend/app/core/response.py
+
+Add a standard response format:
+
+{
+"success": true,
+"data": {},
+"error": null
+}
+
+Update ALL existing routes:
+
+* health.py
+* ai.py
+* integrations.py
+
+So they return this format consistently.
+
+---
+
+# 5. ENFORCE CONFIG USAGE
+
+Ensure:
+
+* All API keys (OpenAI, Anthropic, etc.) are accessed ONLY via core/config.py
+* Remove any direct environment variable usage elsewhere
+
+---
+
+# 6. KEEP EVERYTHING ELSE INTACT
+
+Do NOT modify:
+
+* planner.py logic
+* prompts.py
+* db/session.py
+* db/base.py
+
+---
+
+# OUTPUT REQUIREMENTS
+
+* Show ONLY modified and newly created files
+* Clearly label file paths
+* Ensure imports are correct
+* Ensure code runs without breaking existing structure
+
+---
+
+This is a refactor pass — NOT a rebuild.
+
+Proceed carefully and minimally.

@@ -1,0 +1,28 @@
+{
+  "name": "planora",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Planora - Production-grade monorepo",
+  "workspaces": [
+    "frontend",
+    "realtime",
+    "integrations"
+  ],
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && uvicorn app.main:app --reload --port 8000",
+    "dev:realtime": "cd realtime && npm run dev",
+    "dev:mobile": "cd mobile && npx expo start",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write .",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.0",
+    "concurrently": "^8.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

@@ -1,0 +1,7 @@
+# Pyrefly should type-check the active FastAPI backend with the same
+# virtualenv used to run it locally.
+project-includes = ["planora/backend/app/**/*.py", "planora/backend/alembic/**/*.py"]
+project-excludes = ["**/__pycache__", "**/venv/**", "**/.next/**", "**/node_modules/**"]
+search-path = ["planora/backend"]
+python-interpreter-path = "planora/backend/venv/bin/python"
+python-version = "3.12"

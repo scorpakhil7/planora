@@ -1,0 +1,17 @@
+kind = "web"
+  previewPath = "/"
+  title = "Planora"
+  version = "1.0.0"
+  id = "PlanOraFrontend2026xQ7"
+
+  [[services]]
+  localPort = 5000
+  name = "Planora Frontend"
+  paths = ["/"]
+
+  [services.env]
+  PORT = "5000"
+
+  [services.development]
+  run = "cd planora/frontend && npm install && npm run dev"
+  
