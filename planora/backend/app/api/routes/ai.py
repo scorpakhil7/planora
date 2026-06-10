@@ -32,28 +32,24 @@ class ItineraryRequest(BaseModel):
 
 @router.post("/plan")
 async def create_plan(body: PlanRequest):
-    """Route → AIService → PlannerService: decompose goal into ordered steps."""
     data = await ai_service.generate_plan(body.goal, body.context)
     return ok(data)
 
 
 @router.post("/plan/refine")
 async def refine_plan(body: RefineRequest):
-    """Route → AIService → PlannerService: refine an existing plan."""
     data = await ai_service.refine_plan(body.goal, body.feedback)
     return ok(data)
 
 
 @router.get("/prompts")
 async def get_prompt_names():
-    """List all registered prompt template names."""
     names = await ai_service.get_prompt_names()
     return ok(names)
 
 
 @router.get("/prompts/{name}")
 async def render_prompt(name: str, goal: str = ""):
-    """Render a registered prompt template by name."""
     try:
         data = await ai_service.render_prompt(name, goal=goal)
         return ok(data)
@@ -74,16 +70,39 @@ async def generate_itinerary(
         raise HTTPException(status_code=404, detail="Trip not found.")
 
     destinations = body.destinations or trip.get("destinations") or []
-    location = body.location or trip.get("location") or "Trip"
     start_date = body.start_date or body.startDate or trip.get("start_date")
+    end_date = body.end_date or body.endDate or trip.get("end_date")
+
+    # Read saved fields from metadata
+    meta = trip.get("metadata") or {}
+    from_city = meta.get("from_city") or ""
+    departure_time = meta.get("departure_time") or "09:00"
+    budget_total = meta.get("budget_total") or 0
+    currency = meta.get("currency") or "INR"
+    travelers_count = meta.get("travelers_count") or 1
+
+    first_dest = destinations[0].get("city", "the destination") if destinations else "the destination"
+    goal = (
+        f"Create a travel itinerary from {from_city} to {first_dest}"
+        if from_city else
+        f"Create a travel itinerary for {first_dest}"
+    )
+
+    print(f"DEBUG ai route: from_city={from_city}, departure_time={departure_time}, budget={budget_total}, persons={travelers_count}")
 
     itinerary = await ai_service.generate_itinerary(
         session=session,
         trip_id=body.trip_id,
-        goal=f"Create a travel itinerary for {location}",
+        goal=goal,
         context={
             "destinations": destinations,
             "start_date": start_date,
+            "end_date": end_date,
+            "from_city": from_city,
+            "departure_time": departure_time,
+            "budget_total": budget_total,
+            "currency": currency,
+            "persons": travelers_count,
         },
     )
     return ok({"itinerary": itinerary, "fallback": False})

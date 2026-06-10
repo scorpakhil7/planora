@@ -6,20 +6,12 @@ from pydantic import BaseModel, Field, model_validator
 from app.db.enums import TripStatus
 
 
-# ---------------------------------------------------------------------------
-# Destination sub-schema
-# ---------------------------------------------------------------------------
-
 class DestinationSchema(BaseModel):
     city: str = Field(..., min_length=1, max_length=255)
     country: str = Field(..., min_length=1, max_length=255)
-    order: int = Field(..., ge=1, description="1-indexed position in the trip itinerary")
-    duration_days: int = Field(..., ge=1, description="Number of nights at this destination")
+    order: int = Field(..., ge=1)
+    duration_days: int = Field(..., ge=1)
 
-
-# ---------------------------------------------------------------------------
-# Trip schemas
-# ---------------------------------------------------------------------------
 
 class TripCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
@@ -27,6 +19,13 @@ class TripCreate(BaseModel):
     start_date: date
     end_date: date
     metadata: dict[str, Any] = {}
+
+    # New fields
+    from_city: str | None = None
+    departure_time: str | None = None
+    budget_total: float | None = None
+    currency: str | None = "INR"
+    travelers_count: int | None = 1
 
     @model_validator(mode="after")
     def validate_dates_and_destinations(self) -> "TripCreate":
