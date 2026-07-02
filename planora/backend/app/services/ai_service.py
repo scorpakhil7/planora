@@ -14,6 +14,39 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
+TAVILY_URL = "https://api.tavily.com/search"
+
+
+async def _search_transport_info(from_city: str, to_city: str) -> str:
+    """Search for real train/bus timings between two cities."""
+    if not TAVILY_API_KEY or not from_city or not to_city:
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                TAVILY_URL,
+                json={
+                    "api_key": TAVILY_API_KEY,
+                    "query": f"{from_city} to {to_city} train timing schedule departure arrival 2024",
+                    "max_results": 3,
+                    "search_depth": "basic",
+                },
+            )
+            data = resp.json()
+            results = data.get("results", [])
+            if not results:
+                return ""
+            combined = "\n".join(
+                f"- {r.get('title', '')}: {r.get('content', '')[:400]}"
+                for r in results
+            )
+            print(f"DEBUG Tavily found {len(results)} results for {from_city}→{to_city}")
+            return combined
+    except Exception as e:
+        print(f"Tavily search error: {e}")
+        return ""
+
 
 async def _call_groq(prompt: str) -> str:
     async with httpx.AsyncClient(timeout=120) as client:
@@ -29,12 +62,10 @@ async def _call_groq(prompt: str) -> str:
                     {
                         "role": "system",
                         "content": (
-                            "You are an expert Indian travel planner with accurate knowledge of Indian Railways train schedules, "
-                            "bus routes, and local transport. Always respond with valid JSON only. "
-                            "No markdown, no explanation, no extra text. Never truncate the response. "
-                            "CRITICAL: Only use train timings you are confident are accurate. "
-                            "If unsure of exact timings, say so in notes and provide the IRCTC link to verify. "
-                            "Never fabricate departure or arrival times."
+                            "You are an expert Indian travel planner. "
+                            "Always respond with valid JSON only. No markdown, no explanation. "
+                            "When real train data is provided, use those EXACT timings. "
+                            "Never fabricate timings if real data is available."
                         )
                     },
                     {"role": "user", "content": prompt},
@@ -67,6 +98,7 @@ def _build_prompt(goal: str, context: dict[str, Any]) -> str:
     budget = context.get("budget_total", 0)
     from_city = context.get("from_city", "")
     departure_time = context.get("departure_time", "09:00")
+    transport_data = context.get("transport_search_results", "")
 
     dest_lines = "\n".join(
         f"- {d.get('city')}, {d.get('country', 'India')} for {d.get('duration_days', 2)} days"
@@ -76,6 +108,24 @@ def _build_prompt(goal: str, context: dict[str, Any]) -> str:
     first_city = destinations[0].get("city", "") if destinations else ""
     budget_per_person = int(budget / persons) if persons and budget else budget
 
+    # Build transport section
+    if transport_data:
+        transport_section = f"""
+REAL TRANSPORT DATA FROM WEB SEARCH (use these EXACT timings, do not change them):
+{transport_data}
+
+IMPORTANT: The above is real search data. Extract actual train names, numbers, departure times and arrival times from it.
+Use the train whose departure time is closest to {departure_time}.
+If the journey is overnight, show arrival next morning and adjust Day 1 activities accordingly.
+"""
+    else:
+        transport_section = f"""
+No real-time transport data available. Use your best knowledge of typical trains on this route.
+Pick a train whose departure is closest to {departure_time}.
+For routes over 400km, assume overnight journey (depart evening, arrive next morning).
+Be honest if unsure — write approximate timings.
+"""
+
     return f"""Create a {total_days}-day India travel itinerary in JSON.
 
 FROM: {from_city} TO: {first_city}
@@ -83,49 +133,35 @@ START DATE: {start_date}
 PREFERRED DEPARTURE TIME: {departure_time}
 TRAVELERS: {persons} persons
 TOTAL BUDGET: {currency} {budget} ({currency} {budget_per_person} per person)
-DESTINATIONS: {dest_lines}
+DESTINATIONS:
+{dest_lines}
 
-TRANSPORT ACCURACY RULES (most important):
-- Only use train numbers and names you are confident exist on the {from_city} to {first_city} route
-- Use the ACTUAL departure time of that train — do NOT use {departure_time} as the departure if the real train departs at a different time
-- {departure_time} is the traveler's PREFERRED time — pick the real train closest to that time
-- If a train departs at 18:00 and arrives next day 06:00, show exactly that — arrival on Day 2 morning
-- If traveler arrives early morning (before 07:00), Day 1 activities should be: arrive → check in → rest → light exploration in afternoon only
-- NEVER show a train arriving in 3-4 hours if the actual journey is 10-12 hours
-- In notes field for every transport, add: "⚠️ Verify timings on IRCTC before booking" and include booking link
-
+{transport_section}
 
 DAY STRUCTURE RULES:
 1. DAY 1 (TRAVEL DAY):
-   - Breakfast at home before departure (1 hour before train/bus time)
-   - Real train/bus with ACCURATE departure time (closest to {departure_time})
-   - If overnight journey: arrival next morning, check in, rest, light evening exploration only
-   - If same-day arrival: auto to hotel, freshen up, evening sightseeing, dinner
-   - accommodation nightly_rate = realistic INR per night
+   - Breakfast at home 1 hour before departure
+   - Transport activity at EXACT real departure time (from search data above)
+   - If overnight journey: arrival next morning → check in → rest → lunch → light exploration → dinner
+   - If same-day arrival: auto to hotel → check in → explore → dinner
+   - accommodation nightly_rate = realistic INR
 
-2. DAY 2+ (FULL DAYS):
-   - Breakfast 07:00-08:00
-   - Auto/transport to each attraction separately with cost
+2. DAY 2+ (FULL DAYS — 8am to 9pm):
+   - Breakfast 07:30
+   - Auto/transport to each attraction (separate activity with cost)
    - Lunch 13:00-14:00
-   - Afternoon attractions with transport
-   - Dinner 19:00-20:00
-   - Every movement between locations = separate transport activity with cost
+   - Afternoon attractions with transport between each
+   - Dinner 19:30
 
-3. FOR TIRUPATI specifically:
-   - Tirumala darshan: TTD Bus (₹50), Special Entry Darshan (₹300 per person, book at https://tirupatibalaji.ap.gov.in), Prasad/Laddu (₹50), Temple canteen lunch (₹80-100), TTD Bus back (₹50)
-   - Other Tirupati temples: Govindarajaswami, Kapila Theertham, ISKCON — all free entry, auto between them
+3. FOR TIRUPATI: TTD Bus to Tirumala (₹50), Special Entry Darshan (₹300/person), Prasad (₹50), temple canteen lunch, TTD Bus back (₹50)
 
-4. LAST DAY:
-   - Breakfast, checkout 11:00
-   - Auto to station
-   - Return journey with ACCURATE train timings and IRCTC booking link
-   - Lunch on train if journey > 4 hours
+4. LAST DAY: Breakfast → checkout → auto to station → return train with REAL timings → lunch on train if long journey
 
-5. LOCAL TRANSPORT:
-   - Auto short ₹40-80, medium ₹80-150, long ₹150-300
-   - Every attraction needs auto before it
+5. LOCAL TRANSPORT: Auto between every attraction (₹40-150 per trip)
 
-Return ONLY valid JSON array, no other text:
+6. Budget: All days combined must not exceed {currency} {budget}
+
+Return ONLY valid JSON array:
 [
   {{
     "day_number": 1,
@@ -133,33 +169,10 @@ Return ONLY valid JSON array, no other text:
     "title": "Travel from {from_city} to {first_city}",
     "destination": "{first_city}",
     "activities": [
-      {{
-        "time": "HH:MM",
-        "title": "Breakfast before departure",
-        "location": "{from_city}",
-        "category": "food",
-        "duration_minutes": 30,
-        "cost_estimate": 0,
-        "notes": "Have breakfast at home before leaving"
-      }},
-      {{
-        "time": "HH:MM",
-        "title": "Train/Bus name and number",
-        "location": "{from_city} Railway Station",
-        "category": "transport",
-        "duration_minutes": 720,
-        "cost_estimate": 600,
-        "notes": "Sleeper class ₹X per person. Book at https://www.irctc.co.in/nget/train-search | ⚠️ Verify exact timings on IRCTC before booking"
-      }}
+      {{"time": "HH:MM", "title": "Activity", "location": "Place", "category": "transport", "duration_minutes": 60, "cost_estimate": 500, "notes": "Details"}}
     ],
-    "accommodation": {{
-      "name": "Hotel name",
-      "address": "Area, City, State",
-      "check_in": "HH:MM",
-      "check_out": "11:00",
-      "nightly_rate": 900
-    }},
-    "budget_estimate": 1820,
+    "accommodation": {{"name": "Hotel name", "address": "Area, City", "check_in": "HH:MM", "check_out": "11:00", "nightly_rate": 900}},
+    "budget_estimate": 2000,
     "currency": "{currency}"
   }}
 ]"""
@@ -189,8 +202,21 @@ class AIService:
         from app.services.trip_service import trip_service
 
         ctx = context or {}
+        from_city = ctx.get("from_city", "")
+        destinations = ctx.get("destinations", [])
+        first_city = destinations[0].get("city", "") if destinations else ""
+
         print(f"DEBUG GROQ_API_KEY = '{GROQ_API_KEY[:10]}...'")
-        print(f"DEBUG context = from_city={ctx.get('from_city')}, budget={ctx.get('budget_total')}, departure={ctx.get('departure_time')}")
+        print(f"DEBUG TAVILY_API_KEY = '{TAVILY_API_KEY[:10]}...'")
+        print(f"DEBUG context = from_city={from_city}, budget={ctx.get('budget_total')}, departure={ctx.get('departure_time')}")
+
+        # Search for real transport data before calling AI
+        if from_city and first_city:
+            print(f"DEBUG Searching Tavily for: {from_city} → {first_city}")
+            transport_data = await _search_transport_info(from_city, first_city)
+            ctx["transport_search_results"] = transport_data
+        else:
+            ctx["transport_search_results"] = ""
 
         if GROQ_API_KEY:
             try:
@@ -278,21 +304,21 @@ class AIService:
 
         if is_travel_day:
             activities = [
-                {"time": breakfast_time, "title": "Breakfast before departure", "location": prev_city, "category": "food", "duration_minutes": 30, "cost_estimate": 0, "notes": "Have breakfast at home before leaving"},
-                {"time": departure_time, "title": f"Train/Bus from {prev_city} to {city}", "location": f"{prev_city} Railway Station", "category": "transport", "duration_minutes": 600, "cost_estimate": 600.0 * persons, "notes": f"Book at https://www.irctc.co.in/nget/train-search | ⚠️ Verify exact timings on IRCTC before booking"},
-                {"time": "06:00", "title": "Arrive & auto to hotel", "location": f"{city} Railway Station", "category": "transport", "duration_minutes": 20, "cost_estimate": 120.0 * persons, "notes": "Prepaid auto ~₹100-150"},
-                {"time": "06:30", "title": "Check in & rest", "location": city, "category": "leisure", "duration_minutes": 180, "cost_estimate": 0, "notes": "Check in early, freshen up and rest after overnight journey"},
-                {"time": "13:00", "title": "Lunch", "location": city, "category": "food", "duration_minutes": 60, "cost_estimate": 200.0 * persons, "notes": f"First meal at {city}. Try local specialties."},
-                {"time": "15:00", "title": "Light evening exploration", "location": city, "category": "sightseeing", "duration_minutes": 120, "cost_estimate": 100.0 * persons, "notes": "Light sightseeing near hotel after rest"},
+                {"time": breakfast_time, "title": "Breakfast before departure", "location": prev_city, "category": "food", "duration_minutes": 30, "cost_estimate": 0, "notes": "Have breakfast before leaving"},
+                {"time": departure_time, "title": f"Train/Bus from {prev_city} to {city}", "location": f"{prev_city} Railway Station", "category": "transport", "duration_minutes": 600, "cost_estimate": 600.0 * persons, "notes": "Book on IRCTC or RedBus"},
+                {"time": "06:00", "title": "Arrive & auto to hotel", "location": f"{city} Station", "category": "transport", "duration_minutes": 20, "cost_estimate": 120.0 * persons, "notes": "Prepaid auto ~₹100-150"},
+                {"time": "06:30", "title": "Check in & rest", "location": city, "category": "leisure", "duration_minutes": 180, "cost_estimate": 0, "notes": "Rest after overnight journey"},
+                {"time": "13:00", "title": "Lunch", "location": city, "category": "food", "duration_minutes": 60, "cost_estimate": 200.0 * persons, "notes": "First meal at destination"},
+                {"time": "15:00", "title": "Light evening exploration", "location": city, "category": "sightseeing", "duration_minutes": 120, "cost_estimate": 100.0 * persons, "notes": "Light sightseeing near hotel"},
                 {"time": "19:00", "title": "Dinner", "location": city, "category": "food", "duration_minutes": 60, "cost_estimate": 200.0 * persons, "notes": f"Local cuisine of {city}"},
             ]
         else:
             activities = [
-                {"time": "07:30", "title": "Breakfast", "location": city, "category": "food", "duration_minutes": 45, "cost_estimate": 150.0 * persons, "notes": "Breakfast at hotel or nearby"},
+                {"time": "07:30", "title": "Breakfast", "location": city, "category": "food", "duration_minutes": 45, "cost_estimate": 150.0 * persons, "notes": "Breakfast at hotel"},
                 {"time": "09:00", "title": "Auto to morning attraction", "location": city, "category": "transport", "duration_minutes": 15, "cost_estimate": 80.0 * persons, "notes": "Auto-rickshaw ~₹80-100"},
                 {"time": "09:15", "title": "Morning sightseeing", "location": city, "category": "sightseeing", "duration_minutes": 120, "cost_estimate": 150.0 * persons, "notes": f"Key attractions in {city}"},
-                {"time": "11:30", "title": "Auto to next attraction", "location": city, "category": "transport", "duration_minutes": 15, "cost_estimate": 60.0 * persons, "notes": "Auto-rickshaw ~₹50-80"},
-                {"time": "11:45", "title": "Second attraction", "location": city, "category": "sightseeing", "duration_minutes": 90, "cost_estimate": 100.0 * persons, "notes": f"Another key spot in {city}"},
+                {"time": "11:30", "title": "Auto to next attraction", "location": city, "category": "transport", "duration_minutes": 15, "cost_estimate": 60.0 * persons, "notes": "Auto ~₹50-80"},
+                {"time": "11:45", "title": "Second attraction", "location": city, "category": "sightseeing", "duration_minutes": 90, "cost_estimate": 100.0 * persons, "notes": f"Another spot in {city}"},
                 {"time": "13:30", "title": "Auto to restaurant", "location": city, "category": "transport", "duration_minutes": 10, "cost_estimate": 50.0 * persons, "notes": "Auto to lunch"},
                 {"time": "13:45", "title": "Lunch", "location": city, "category": "food", "duration_minutes": 60, "cost_estimate": 200.0 * persons, "notes": "Local cuisine"},
                 {"time": "15:30", "title": "Auto to afternoon attraction", "location": city, "category": "transport", "duration_minutes": 15, "cost_estimate": 70.0 * persons, "notes": "Auto ~₹70-100"},
@@ -303,12 +329,7 @@ class AIService:
         return {
             "day_number": day_num, "date": day_date, "title": title, "destination": city,
             "activities": activities,
-            "accommodation": {
-                "name": f"Hotel {city} Central",
-                "address": f"City Centre, {city}, {country}",
-                "check_in": "07:00", "check_out": "11:00",
-                "nightly_rate": hotel_rate
-            },
+            "accommodation": {"name": f"Hotel {city} Central", "address": f"City Centre, {city}, {country}", "check_in": "07:00", "check_out": "11:00", "nightly_rate": hotel_rate},
             "transportation": None,
             "budget_estimate": round(sum(a["cost_estimate"] for a in activities) + hotel_rate, 2),
             "currency": currency,
