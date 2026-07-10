@@ -9,7 +9,6 @@ export type Festival = {
   emoji: string;
   level: SurgeLevel;
   advice: string;
-  // Array of { month, startDay, endDay } windows (repeats for multi-year ranges)
   windows: { month: number; startDay: number; endDay: number }[];
 };
 
@@ -36,9 +35,7 @@ export const FESTIVALS: Festival[] = [
     emoji: "🙏",
     level: "high",
     advice: "Massive surge especially to Kolkata, Varanasi, Gujarat. Flights and trains fill up fast — book 45+ days ahead.",
-    windows: [
-      { month: 10, startDay: 1, endDay: 15 },
-    ],
+    windows: [{ month: 10, startDay: 1, endDay: 15 }],
   },
   {
     name: "New Year",
@@ -71,6 +68,32 @@ export const FESTIVALS: Festival[] = [
     ],
   },
   {
+    name: "Rath Yatra",
+    emoji: "🎡",
+    level: "high",
+    advice: "One of India's largest festivals — massive pilgrimage rush to Puri, Odisha. Trains on Howrah-Puri and Bhubaneswar routes pack up weeks in advance. Book 45 days ahead.",
+    windows: [
+      { month: 6, startDay: 25, endDay: 30 },
+      { month: 7, startDay: 1, endDay: 10 },
+    ],
+  },
+  {
+    name: "School Holidays Rush",
+    emoji: "🎒",
+    level: "medium",
+    advice: "Last family trips before schools reopen. Hill stations, pilgrimages and religious sites across India see heavy rush. Book hotels early.",
+    windows: [
+      { month: 7, startDay: 1, endDay: 15 },
+    ],
+  },
+  {
+    name: "Guru Purnima",
+    emoji: "🌕",
+    level: "low",
+    advice: "Surge to pilgrimage spots and ashrams across India. Trains to Rishikesh, Varanasi, Shirdi, Haridwar see extra demand.",
+    windows: [{ month: 7, startDay: 10, endDay: 22 }],
+  },
+  {
     name: "Christmas",
     emoji: "🎄",
     level: "medium",
@@ -82,7 +105,10 @@ export const FESTIVALS: Festival[] = [
     emoji: "🐘",
     level: "medium",
     advice: "Heavy travel to Mumbai and Pune. Expect crowded trains on Western Railway. Book 30 days in advance.",
-    windows: [{ month: 8, startDay: 25, endDay: 31 }, { month: 9, startDay: 1, endDay: 5 }],
+    windows: [
+      { month: 8, startDay: 25, endDay: 31 },
+      { month: 9, startDay: 1, endDay: 5 },
+    ],
   },
   {
     name: "Pongal / Makar Sankranti",
@@ -107,7 +133,7 @@ export const FESTIVALS: Festival[] = [
   },
 ];
 
-// ─── Check if dates fall in any festival window ───────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SurgeResult = {
   detected: boolean;
@@ -115,29 +141,34 @@ export type SurgeResult = {
   highestLevel: SurgeLevel | null;
 };
 
-function dateInWindow(
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function dateInFestivalWindow(
   date: Date,
-  window: { month: number; startDay: number; endDay: number }
+  range: { month: number; startDay: number; endDay: number }
 ): boolean {
   const month = date.getMonth() + 1;
   const day = date.getDate();
-  return month === window.month && day >= window.startDay && day <= window.endDay;
+  return month === range.month && day >= range.startDay && day <= range.endDay;
 }
 
-function datesOverlapWindow(
+function tripOverlapsFestival(
   start: Date,
   end: Date,
-  window: { month: number; startDay: number; endDay: number }
+  range: { month: number; startDay: number; endDay: number }
 ): boolean {
-  // Check each day in the trip range (up to 30 days)
   const current = new Date(start);
-  while (current <= end) {
-    if (dateInWindow(current, window)) return true;
+  let iterations = 0;
+  const maxDays = 60;
+  while (current <= end && iterations < maxDays) {
+    if (dateInFestivalWindow(current, range)) return true;
     current.setDate(current.getDate() + 1);
-    if (current.getTime() - start.getTime() > 30 * 24 * 60 * 60 * 1000) break;
+    iterations++;
   }
   return false;
 }
+
+// ─── Main export ──────────────────────────────────────────────────────────────
 
 export function checkFestivalSurge(startDate: string, endDate: string): SurgeResult {
   if (!startDate) return { detected: false, festivals: [], highestLevel: null };
@@ -148,7 +179,9 @@ export function checkFestivalSurge(startDate: string, endDate: string): SurgeRes
   const detected: Festival[] = [];
 
   for (const festival of FESTIVALS) {
-    const overlaps = festival.windows.some((w) => datesOverlapWindow(start, end, w));
+    const overlaps = festival.windows.some((range) =>
+      tripOverlapsFestival(start, end, range)
+    );
     if (overlaps) detected.push(festival);
   }
 

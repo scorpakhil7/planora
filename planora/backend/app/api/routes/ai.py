@@ -81,14 +81,19 @@ async def generate_itinerary(
     currency = meta.get("currency") or "INR"
     travelers_count = meta.get("travelers_count") or 1
 
+    # Pilgrimage fields
+    pilgrimage_mode = meta.get("pilgrimage_mode") or False
+    darshan_type = meta.get("darshan_type") or "general"
+    pilgrimage_accommodation = meta.get("pilgrimage_accommodation") or "budget_hotel"
+
     first_dest = destinations[0].get("city", "the destination") if destinations else "the destination"
     goal = (
-        f"Create a travel itinerary from {from_city} to {first_dest}"
+        f"Create a {'pilgrimage' if pilgrimage_mode else 'travel'} itinerary from {from_city} to {first_dest}"
         if from_city else
-        f"Create a travel itinerary for {first_dest}"
+        f"Create a {'pilgrimage' if pilgrimage_mode else 'travel'} itinerary for {first_dest}"
     )
 
-    print(f"DEBUG ai route: from_city={from_city}, departure_time={departure_time}, budget={budget_total}, persons={travelers_count}")
+    print(f"DEBUG ai route: from_city={from_city}, departure_time={departure_time}, budget={budget_total}, persons={travelers_count}, pilgrimage={pilgrimage_mode}")
 
     itinerary = await ai_service.generate_itinerary(
         session=session,
@@ -103,6 +108,10 @@ async def generate_itinerary(
             "budget_total": budget_total,
             "currency": currency,
             "persons": travelers_count,
+            # Pilgrimage context
+            "pilgrimage_mode": pilgrimage_mode,
+            "darshan_type": darshan_type,
+            "pilgrimage_accommodation": pilgrimage_accommodation,
         },
     )
     return ok({"itinerary": itinerary, "fallback": False})

@@ -25,6 +25,18 @@ const DEPARTURE_TIMES = [
   { label: "Evening", sub: "4:00 PM – 9:00 PM", value: "17:00", icon: "🌆" },
 ];
 
+const DARSHAN_TYPES = [
+  { label: "General Darshan", sub: "Free — longer queue (2–6 hrs)", value: "general", icon: "🙏" },
+  { label: "Special Entry", sub: "₹300/person — 1–2 hr queue", value: "special_entry", icon: "⭐" },
+  { label: "VIP Darshan", sub: "₹1,000+/person — minimal wait", value: "vip", icon: "👑" },
+];
+
+const PILGRIMAGE_ACCOMMODATION = [
+  { label: "Dharmashala", sub: "₹100–₹500/night — basic, near temple", value: "dharmashala", icon: "🛕" },
+  { label: "Budget Hotel", sub: "₹500–₹1,500/night", value: "budget_hotel", icon: "🏩" },
+  { label: "Regular Hotel", sub: "₹1,500+/night — more comfort", value: "hotel", icon: "🏨" },
+];
+
 function formatINR(amount: number) {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -71,6 +83,11 @@ function FestivalSurgeBanner({ surge }: { surge: SurgeResult }) {
 
 export default function NewTripPage() {
   const router = useRouter();
+
+  // Mode
+  const [mode, setMode] = useState<"regular" | "pilgrimage">("regular");
+
+  // Common fields
   const [title, setTitle] = useState("");
   const [fromCity, setFromCity] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -86,10 +103,20 @@ export default function NewTripPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Pilgrimage-only fields
+  const [darshanType, setDarshanType] = useState("special_entry");
+  const [pilgrimAccommodation, setPilgrimAccommodation] = useState("budget_hotel");
+
   useEffect(() => {
     if (startDate) setSurge(checkFestivalSurge(startDate, endDate));
     else setSurge({ detected: false, festivals: [], highestLevel: null });
   }, [startDate, endDate]);
+
+  // Reset title hint when mode changes
+  useEffect(() => {
+    setTitle("");
+    setDestinations([{ city: "", country: "India", order: 1 }]);
+  }, [mode]);
 
   const totalDays = calcDays(startDate, endDate);
 
@@ -138,13 +165,13 @@ export default function NewTripPage() {
       return;
     }
 
-    // Distribute days equally across destinations
     const daysPerDest = Math.max(1, Math.floor(totalDays / filledDests.length));
     const destsWithDays = filledDests.map((d, i) => ({
       ...d,
-      duration_days: i === filledDests.length - 1
-        ? totalDays - daysPerDest * (filledDests.length - 1)
-        : daysPerDest,
+      duration_days:
+        i === filledDests.length - 1
+          ? totalDays - daysPerDest * (filledDests.length - 1)
+          : daysPerDest,
     }));
 
     setLoading(true);
@@ -159,6 +186,10 @@ export default function NewTripPage() {
         from_city: fromCity,
         departure_time: departureTime,
         destinations: destsWithDays,
+        // Pilgrimage fields (ignored by AI if mode = regular)
+        pilgrimage_mode: mode === "pilgrimage",
+        darshan_type: mode === "pilgrimage" ? darshanType : null,
+        pilgrimage_accommodation: mode === "pilgrimage" ? pilgrimAccommodation : null,
       });
       router.push(`/trips/${trip.id}`);
     } catch (err: any) {
@@ -169,13 +200,57 @@ export default function NewTripPage() {
 
   const budgetPerDay = totalDays > 0 ? Math.round(budget / totalDays) : 0;
   const budgetPerPerson = persons > 0 ? Math.round(budget / persons) : budget;
+  const isPilgrimage = mode === "pilgrimage";
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Plan a new trip</h1>
-        <p className="text-gray-500 mt-1">Fill in the details and let AI build your itinerary</p>
+        <h1 className="text-3xl font-bold text-gray-900">
+          {isPilgrimage ? "Plan a Pilgrimage" : "Plan a new trip"}
+        </h1>
+        <p className="text-gray-500 mt-1">
+          {isPilgrimage
+            ? "AI will plan only spiritual & religious places at your destination"
+            : "Fill in the details and let AI build your itinerary"}
+        </p>
       </div>
+
+      {/* ── Mode Toggle ──────────────────────────────────────────────────── */}
+      <div className="flex gap-2 p-1 bg-gray-100 rounded-2xl">
+        <button
+          type="button"
+          onClick={() => setMode("regular")}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
+            !isPilgrimage
+              ? "bg-white text-indigo-700 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          🗺️ Regular Trip
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("pilgrimage")}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
+            isPilgrimage
+              ? "bg-white text-orange-600 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          🛕 Pilgrimage Mode
+        </button>
+      </div>
+
+      {/* Pilgrimage mode info banner */}
+      {isPilgrimage && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl px-5 py-4 space-y-1">
+          <p className="text-sm font-semibold text-orange-700">🙏 Pilgrimage Mode is ON</p>
+          <p className="text-xs text-orange-600">
+            AI will only suggest temples, ghats, ashrams, and sacred sites — no regular tourist spots.
+            Includes darshan timings, queue tips, and prasad costs.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
@@ -191,7 +266,7 @@ export default function NewTripPage() {
             <input
               type="text" required value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Rajasthan Road Trip 2025"
+              placeholder={isPilgrimage ? "e.g. Tirupati Darshan 2026" : "e.g. Rajasthan Road Trip 2025"}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
             />
           </div>
@@ -232,7 +307,6 @@ export default function NewTripPage() {
             </div>
           </div>
 
-          {/* Auto-calculated days */}
           {totalDays > 0 && (
             <div className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 rounded-xl">
               <span className="text-indigo-600">🗓</span>
@@ -241,7 +315,6 @@ export default function NewTripPage() {
             </div>
           )}
 
-          {/* Departure time */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Preferred departure time on Day 1</label>
             <div className="grid grid-cols-2 gap-2">
@@ -259,6 +332,51 @@ export default function NewTripPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Pilgrimage-specific options ──────────────────────────────────── */}
+        {isPilgrimage && (
+          <>
+            {/* Darshan Type */}
+            <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-6 space-y-4">
+              <h2 className="font-semibold text-gray-800">🙏 Darshan Preference</h2>
+              <p className="text-xs text-gray-400">AI will plan your temple visit based on your darshan type including queue time and cost.</p>
+              <div className="space-y-2">
+                {DARSHAN_TYPES.map((d) => (
+                  <button key={d.value} type="button" onClick={() => setDarshanType(d.value)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition ${darshanType === d.value ? "border-orange-400 bg-orange-50 text-orange-700" : "border-gray-200 text-gray-600 hover:border-orange-300 hover:bg-orange-50"}`}
+                  >
+                    <span className="text-xl">{d.icon}</span>
+                    <div>
+                      <p className="text-sm font-semibold">{d.label}</p>
+                      <p className="text-xs opacity-70">{d.sub}</p>
+                    </div>
+                    {darshanType === d.value && <span className="ml-auto text-orange-500 font-bold">✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Accommodation preference */}
+            <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-6 space-y-4">
+              <h2 className="font-semibold text-gray-800">🏠 Stay Preference</h2>
+              <p className="text-xs text-gray-400">Pilgrims often prefer dharmashalas near the temple for early-morning darshan access.</p>
+              <div className="space-y-2">
+                {PILGRIMAGE_ACCOMMODATION.map((a) => (
+                  <button key={a.value} type="button" onClick={() => setPilgrimAccommodation(a.value)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition ${pilgrimAccommodation === a.value ? "border-orange-400 bg-orange-50 text-orange-700" : "border-gray-200 text-gray-600 hover:border-orange-300 hover:bg-orange-50"}`}
+                  >
+                    <span className="text-xl">{a.icon}</span>
+                    <div>
+                      <p className="text-sm font-semibold">{a.label}</p>
+                      <p className="text-xs opacity-70">{a.sub}</p>
+                    </div>
+                    {pilgrimAccommodation === a.value && <span className="ml-auto text-orange-500 font-bold">✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Festival Surge Alert */}
         {surge.detected && <FestivalSurgeBanner surge={surge} />}
@@ -316,10 +434,16 @@ export default function NewTripPage() {
         {/* Destinations */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-800">Destinations</h2>
+            <h2 className="font-semibold text-gray-800">
+              {isPilgrimage ? "Pilgrimage Destinations" : "Destinations"}
+            </h2>
             <button type="button" onClick={addDestination} className="text-sm text-indigo-600 font-medium hover:text-indigo-700">+ Add destination</button>
           </div>
-          <p className="text-xs text-gray-400">Days will be split equally across destinations based on your travel dates.</p>
+          <p className="text-xs text-gray-400">
+            {isPilgrimage
+              ? "Enter the city/town with the temple or spiritual site (e.g. Tirupati, Varanasi, Shirdi)."
+              : "Days will be split equally across destinations based on your travel dates."}
+          </p>
 
           <div className="space-y-3">
             {destinations.map((dest, i) => (
@@ -328,7 +452,7 @@ export default function NewTripPage() {
                 <input
                   type="text" required value={dest.city}
                   onChange={(e) => updateDestination(i, "city", e.target.value)}
-                  placeholder="City (e.g. Jaipur)"
+                  placeholder={isPilgrimage ? "e.g. Tirupati, Varanasi, Shirdi" : "City (e.g. Jaipur)"}
                   className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
                 <input
@@ -349,9 +473,11 @@ export default function NewTripPage() {
         <div className="flex gap-3">
           <button type="button" onClick={() => router.back()} className="px-6 py-3 text-gray-600 font-medium border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
           <button type="submit" disabled={loading}
-            className="flex-1 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            className={`flex-1 py-3 font-semibold rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white ${isPilgrimage ? "bg-orange-500 hover:bg-orange-600" : "bg-indigo-600 hover:bg-indigo-700"}`}
           >
-            {loading ? "Creating trip..." : "Create trip →"}
+            {loading
+              ? isPilgrimage ? "Planning pilgrimage..." : "Creating trip..."
+              : isPilgrimage ? "Plan Pilgrimage →" : "Create trip →"}
           </button>
         </div>
       </form>

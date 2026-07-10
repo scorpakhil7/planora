@@ -99,6 +99,9 @@ def _build_prompt(goal: str, context: dict[str, Any]) -> str:
     from_city = context.get("from_city", "")
     departure_time = context.get("departure_time", "09:00")
     transport_data = context.get("transport_search_results", "")
+    pilgrimage_mode = context.get("pilgrimage_mode", False)
+    darshan_type = context.get("darshan_type", "general")
+    pilgrimage_accommodation = context.get("pilgrimage_accommodation", "budget_hotel")
 
     dest_lines = "\n".join(
         f"- {d.get('city')}, {d.get('country', 'India')} for {d.get('duration_days', 2)} days"
@@ -126,6 +129,36 @@ For routes over 400km, assume overnight journey (depart evening, arrive next mor
 Be honest if unsure — write approximate timings.
 """
 
+    # ── Pilgrimage section ───────────────────────────────────────────────────
+    darshan_labels = {
+        "general": "General Darshan (free, expect 2–6 hour queue)",
+        "special_entry": "Special Entry Darshan (₹300/person, 1–2 hour queue)",
+        "vip": "VIP Darshan (₹1,000+/person, minimal wait — under 30 mins)",
+    }
+    accommodation_labels = {
+        "dharmashala": "Dharmashala / pilgrim rest house (₹100–₹500/night, near temple)",
+        "budget_hotel": "Budget hotel (₹500–₹1,500/night)",
+        "hotel": "Regular hotel (₹1,500+/night)",
+    }
+    pilgrimage_section = ""
+    if pilgrimage_mode:
+        pilgrimage_section = f"""
+PILGRIMAGE MODE — STRICT RULES (ALL MUST BE FOLLOWED):
+1. ONLY suggest temples, ghats, ashrams, mosques, gurudwaras, churches, and sacred sites.
+   NO malls, parks, museums (unless religious), nightlife, or regular tourist attractions.
+2. Darshan preference: {darshan_labels.get(darshan_type, "General Darshan")}
+   - Plan temple visit timing based on this — include realistic queue wait time as an activity.
+3. Accommodation: {accommodation_labels.get(pilgrimage_accommodation, "Budget hotel")}
+   - Use this type for the accommodation field in every day.
+4. Include morning aarti time (if applicable) and evening aarti time for each temple.
+5. Include prasad cost and donation box note for major temples.
+6. Mention dress code requirements (no leather, covered head/shoulders etc.) in activity notes.
+7. Include local pilgrimage transport (TTD buses, shared autos, palki for Vaishno Devi etc.)
+8. Lunch and dinner at temple canteen / prasadam hall / vegetarian-only restaurants near temple.
+9. Do NOT include alcohol, nightlife, or non-vegetarian food anywhere.
+10. Day structure: Early morning aarti → darshan → breakfast → nearby sacred sites → lunch at temple canteen → more sacred sites / ashram visit → evening aarti → dinner → rest.
+"""
+
     return f"""Create a {total_days}-day India travel itinerary in JSON.
 
 FROM: {from_city} TO: {first_city}
@@ -133,6 +166,7 @@ START DATE: {start_date}
 PREFERRED DEPARTURE TIME: {departure_time}
 TRAVELERS: {persons} persons
 TOTAL BUDGET: {currency} {budget} ({currency} {budget_per_person} per person)
+{pilgrimage_section}
 DESTINATIONS:
 {dest_lines}
 

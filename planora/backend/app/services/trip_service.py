@@ -32,6 +32,13 @@ class TripService:
             metadata["currency"] = payload.currency
         if payload.travelers_count is not None:
             metadata["travelers_count"] = payload.travelers_count
+        # Pilgrimage fields
+        if payload.pilgrimage_mode is not None:
+            metadata["pilgrimage_mode"] = payload.pilgrimage_mode
+        if payload.darshan_type:
+            metadata["darshan_type"] = payload.darshan_type
+        if payload.pilgrimage_accommodation:
+            metadata["pilgrimage_accommodation"] = payload.pilgrimage_accommodation
 
         trip = Trip(
             id=uuid.uuid4(),

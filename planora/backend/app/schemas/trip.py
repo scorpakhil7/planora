@@ -20,12 +20,17 @@ class TripCreate(BaseModel):
     end_date: date
     metadata: dict[str, Any] = {}
 
-    # New fields
+    # Trip fields
     from_city: str | None = None
     departure_time: str | None = None
     budget_total: float | None = None
     currency: str | None = "INR"
     travelers_count: int | None = 1
+
+    # Pilgrimage fields
+    pilgrimage_mode: bool | None = False
+    darshan_type: str | None = None          # general / special_entry / vip
+    pilgrimage_accommodation: str | None = None  # dharmashala / budget_hotel / hotel
 
     @model_validator(mode="after")
     def validate_dates_and_destinations(self) -> "TripCreate":
