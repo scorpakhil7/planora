@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PageLoader } from "@/components/GlobeLoader";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { get } from "@/lib/api";
@@ -186,13 +187,7 @@ export default function BudgetPage() {
   }, [tripId]);
 
   if (loading) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-4 animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-1/3" />
-        <div className="h-32 bg-gray-100 rounded-2xl" />
-        <div className="h-64 bg-gray-100 rounded-2xl" />
-      </div>
-    );
+    return <PageLoader label="Loading budget breakdown..." />;
   }
 
   if (error || !trip) {

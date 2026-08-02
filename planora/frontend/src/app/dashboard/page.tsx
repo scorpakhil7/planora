@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { get } from "@/lib/api";
 import { getCurrentUser, isAuthenticated } from "@/lib/auth";
+import { PageLoader } from "@/components/GlobeLoader";
 
 type Destination = { city: string; country: string; duration_days: number; };
 type Trip = {
@@ -92,15 +93,7 @@ export default function DashboardPage() {
   const firstName = user?.name?.split(" ")[0] || "";
 
   if (loading) {
-    return (
-      <div className="space-y-8 animate-pulse">
-        <div className="h-10 bg-gray-200 rounded-xl w-64" />
-        <div className="grid grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => <div key={i} className="h-24 bg-gray-100 rounded-2xl" />)}
-        </div>
-        <div className="h-36 bg-gray-100 rounded-2xl" />
-      </div>
-    );
+    return <PageLoader label="Loading your dashboard..." />;
   }
 
   return (

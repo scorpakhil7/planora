@@ -6,6 +6,7 @@ import { get, post } from "@/lib/api";
 import { isAuthenticated } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
 import Link from "next/link";
+import GlobeLoader, { PageLoader } from "@/components/GlobeLoader";
 
 type Destination = { city: string; country: string; duration_days: number; };
 type Activity = { time: string; title: string; location: string; category: string; duration_minutes: number; cost_estimate: number; notes: string; };
@@ -141,7 +142,7 @@ function DayCard({ day }: { day: ItineraryDay }) {
 
 function SkeletonDay() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-pulse space-y-3">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 rounded-xl bg-gray-200" />
         <div className="space-y-2 flex-1">

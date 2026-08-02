@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import GlobeLoader from "@/components/GlobeLoader";
 import { get } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 
@@ -58,21 +59,9 @@ function chartBadgeColor(status: string): string {
 
 function ResultSkeleton() {
   return (
-    <div className="space-y-4 animate-pulse">
-      <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
-        <div className="h-5 bg-gray-200 rounded w-2/3" />
-        <div className="h-4 bg-gray-100 rounded w-1/3" />
-        <div className="flex gap-4">
-          <div className="h-4 bg-gray-100 rounded w-1/4" />
-          <div className="h-4 bg-gray-100 rounded w-1/4" />
-        </div>
-      </div>
-      <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-3">
-        <div className="h-4 bg-gray-200 rounded w-1/4" />
-        {[1, 2].map((i) => (
-          <div key={i} className="h-12 bg-gray-100 rounded-xl" />
-        ))}
-      </div>
+    <div className="flex flex-col items-center justify-center py-12 gap-3">
+      <GlobeLoader size={56} />
+      <p className="text-sm text-gray-400 font-medium animate-pulse">Fetching PNR status...</p>
     </div>
   );
 }
@@ -267,7 +256,7 @@ export default function PNRPage() {
             disabled={!canCheck}
             className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
           >
-            {loading ? "Checking…" : "Check Status"}
+            {loading ? <GlobeLoader size={22} /> : "Check Status"}
           </button>
         </div>
         <p className="text-xs text-gray-400">
