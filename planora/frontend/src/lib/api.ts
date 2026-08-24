@@ -105,3 +105,71 @@ export async function generateItinerary(data: {
 }): Promise<{ itinerary: Itinerary }> {
   return post<{ itinerary: Itinerary }>("/api/ai/itinerary", data);
 }
+
+// ---------- Profile ----------
+
+export type TravelPreferences = {
+  dietary?: string | null;
+  hotel_tier?: string | null;
+  seat_class?: string | null;
+};
+
+export type Traveler = {
+  id: string;
+  name: string;
+  relation?: string | null;
+  age?: number | null;
+  dietary?: string | null;
+  accessibility_needs?: string | null;
+};
+
+export type UserProfile = {
+  id: string;
+  email: string;
+  name: string;
+  is_active: boolean;
+  is_verified: boolean;
+  preferences: {
+    phone?: string;
+    travelers?: Traveler[];
+    travel_preferences?: TravelPreferences;
+    [key: string]: unknown;
+  };
+};
+
+export async function getProfile(): Promise<UserProfile> {
+  return get<UserProfile>("/auth/me");
+}
+
+export async function updateProfile(data: {
+  name?: string;
+  phone?: string;
+}): Promise<UserProfile> {
+  return request_patch<UserProfile>("/users/me", data);
+}
+
+export async function changePassword(data: {
+  current_password: string;
+  new_password: string;
+}): Promise<{ changed: boolean }> {
+  return put<{ changed: boolean }>("/users/me/password", data);
+}
+
+export async function updateTravelers(travelers: Traveler[]): Promise<UserProfile> {
+  return put<UserProfile>("/users/me/travelers", { travelers });
+}
+
+export async function updateTravelPreferences(
+  prefs: TravelPreferences
+): Promise<UserProfile> {
+  return put<UserProfile>("/users/me/travel-preferences", prefs);
+}
+
+async function request_patch<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(buildApiUrl(url), {
+    method: "PATCH",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  return parseResponse<T>(res);
+}

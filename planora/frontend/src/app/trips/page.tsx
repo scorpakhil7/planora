@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { get, del } from "@/lib/api";
 import { isAuthenticated } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 type Destination = { city: string; country: string; duration_days: number; };
 type Trip = { id: string; title: string; destinations: Destination[]; start_date: string | null; end_date: string | null; status: string; created_at: string; itinerary: any | null; };
@@ -36,9 +37,9 @@ function TripSkeleton() {
   );
 }
 
-function TripCard({ trip, onDelete }: { trip: Trip; onDelete: (id: string) => void }) {
+function TripCard({ trip, onDelete, t }: { trip: Trip; onDelete: (id: string) => void; t: (k: string) => string }) {
   const destinations = trip.destinations || [];
-  const cityNames = destinations.map((d) => d.city).join(" → ") || "No destinations";
+  const cityNames = destinations.map((d) => d.city).join(" → ") || t("tripsList.noDestinations");
   const totalDays = destinations.reduce((sum, d) => sum + (d.duration_days || 0), 0);
 
   return (
@@ -56,20 +57,20 @@ function TripCard({ trip, onDelete }: { trip: Trip; onDelete: (id: string) => vo
         <span>📅 {formatDate(trip.start_date)} – {formatDate(trip.end_date)}</span>
         {totalDays > 0 && <span>🗓 {totalDays}d</span>}
         {trip.itinerary ? (
-          <span className="text-green-600 text-xs font-medium">✅ Itinerary ready</span>
+          <span className="text-green-600 text-xs font-medium">{t("tripsList.itineraryReady")}</span>
         ) : (
-          <span className="text-orange-500 text-xs font-medium">⏳ No itinerary</span>
+          <span className="text-orange-500 text-xs font-medium">{t("tripsList.noItinerary")}</span>
         )}
       </div>
       <div className="flex items-center gap-2 pt-1">
         <Link href={`/trips/${trip.id}`} className="flex-1 text-center py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors">
-          View Trip
+          {t("tripsList.viewTrip")}
         </Link>
         <button
           onClick={() => onDelete(trip.id)}
           className="px-4 py-2 text-sm font-medium text-red-500 border border-red-100 rounded-xl hover:bg-red-50 transition-colors"
         >
-          Delete
+          {t("tripsList.delete")}
         </button>
       </div>
     </div>
@@ -79,6 +80,7 @@ function TripCard({ trip, onDelete }: { trip: Trip; onDelete: (id: string) => vo
 export default function TripsPage() {
   const router = useRouter();
   const toast = useToast();
+  const { t } = useTranslation();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -92,20 +94,20 @@ export default function TripsPage() {
       const data = await get<Trip[]>("/trips");
       setTrips(data);
     } catch (err: any) {
-      toast.error("Failed to load trips. Please refresh.");
+      toast.error(t("tripsList.loadFailed"));
     } finally {
       setLoading(false);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this trip? This cannot be undone.")) return;
+    if (!confirm(t("tripsList.confirmDelete"))) return;
     try {
       await del(`/trips/${id}`);
       setTrips((prev) => prev.filter((t) => t.id !== id));
-      toast.success("Trip deleted.");
+      toast.success(t("tripsList.deleteSuccess"));
     } catch (err: any) {
-      toast.error("Failed to delete trip.");
+      toast.error(t("tripsList.deleteFailed"));
     }
   }
 
@@ -113,11 +115,11 @@ export default function TripsPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Trips</h1>
-          <p className="text-gray-500 mt-1">All your travel plans in one place</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t("tripsList.title")}</h1>
+          <p className="text-gray-500 mt-1">{t("tripsList.subtitle")}</p>
         </div>
         <Link href="/trips/new" className="px-5 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
-          + New Trip
+          {t("tripsList.newTrip")}
         </Link>
       </div>
 
@@ -130,17 +132,17 @@ export default function TripsPage() {
       {!loading && trips.length === 0 && (
         <div className="text-center py-20 space-y-4">
           <div className="text-5xl">🧳</div>
-          <h2 className="text-xl font-semibold text-gray-700">No trips yet</h2>
-          <p className="text-gray-400">Start planning your first adventure</p>
+          <h2 className="text-xl font-semibold text-gray-700">{t("tripsList.noTripsYet")}</h2>
+          <p className="text-gray-400">{t("tripsList.startPlanning")}</p>
           <Link href="/trips/new" className="inline-block mt-2 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors">
-            Create your first trip
+            {t("tripsList.createFirstTrip")}
           </Link>
         </div>
       )}
 
       {!loading && trips.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {trips.map((trip) => <TripCard key={trip.id} trip={trip} onDelete={handleDelete} />)}
+          {trips.map((trip) => <TripCard key={trip.id} trip={trip} onDelete={handleDelete} t={t} />)}
         </div>
       )}
     </div>

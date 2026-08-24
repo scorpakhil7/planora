@@ -1,79 +1,168 @@
-from __future__ import annotations
-
 import uuid
-
+from datetime import datetime, timedelta
 from fastapi import HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from app.core.security import (
-    create_access_token,
-    create_refresh_token,
-    decode_token,
-    hash_password,
-    verify_password,
-)
+from app.core.security import hash_password, verify_password, create_access_token
 from app.db.models.user import User
-from app.schemas.user import TokenResponse, UserCreate, UserLogin, UserResponse
+from app.schemas.auth import UserCreate, LoginRequest, TokenResponse
+from app.core.email import generate_otp, send_otp_email
 
 
 class AuthService:
-    """Handles signup, login, token refresh, and current-user resolution."""
+    """Handles user authentication and email verification."""
 
-    async def signup(self, session: AsyncSession, payload: UserCreate) -> UserResponse:
-        existing = await session.scalar(select(User).where(User.email == payload.email))
-        if existing:
+    async def signup(self, session: AsyncSession, payload: UserCreate) -> dict:
+        """Create user, generate OTP, send email. Returns user info."""
+        # Check if email exists
+        existing = await session.execute(select(User).where(User.email == payload.email))
+        if existing.scalar():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Email already registered.",
             )
 
+        # Create user (unverified)
         user = User(
             id=uuid.uuid4(),
             email=payload.email,
             name=payload.name,
             password_hash=hash_password(payload.password),
-            preferences={},
+            is_verified=False,
         )
         session.add(user)
         await session.flush()
-        await session.refresh(user)
-        return UserResponse(**user.to_dict())
 
-    async def login(self, session: AsyncSession, payload: UserLogin) -> TokenResponse:
-        user = await session.scalar(select(User).where(User.email == payload.email))
-        if not user or not verify_password(payload.password, user.password_hash):
+        # Generate OTP and store in preferences
+        otp = generate_otp()
+        otp_expires = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+        user.preferences = {"otp": otp, "otp_expires": otp_expires}
+        await session.flush()
+
+        # Send email
+        send_otp_email(user.email, otp, user.name)
+
+        # Commit
+        await session.commit()
+
+        return {"email": user.email, "id": str(user.id)}
+
+    async def verify_otp(
+        self, session: AsyncSession, email: str, otp: str
+    ) -> User:
+        """Verify OTP and mark user as verified."""
+        user = await session.execute(select(User).where(User.email == email))
+        user = user.scalar()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+
+        if user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already verified.",
+            )
+
+        stored_otp = user.preferences.get("otp")
+        otp_expires_str = user.preferences.get("otp_expires")
+
+        if not stored_otp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No OTP found. Request a new one.",
+            )
+
+        if otp_expires_str and datetime.fromisoformat(otp_expires_str) < datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="OTP expired.",
+            )
+
+        if stored_otp != otp:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password.",
+                detail="Invalid OTP.",
             )
-        if not user.is_active:
+
+        # Mark as verified and clear OTP
+        user.is_verified = True
+        user.preferences = {}
+        await session.commit()
+
+        return user
+
+    async def resend_otp(self, session: AsyncSession, email: str) -> None:
+        """Resend OTP to email."""
+        user = await session.execute(select(User).where(User.email == email))
+        user = user.scalar()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+
+        if user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already verified.",
+            )
+
+        # Generate new OTP
+        otp = generate_otp()
+        otp_expires = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+        user.preferences = {"otp": otp, "otp_expires": otp_expires}
+        await session.flush()
+
+        # Send email
+        send_otp_email(user.email, otp, user.name)
+
+        await session.commit()
+
+    async def login(self, session: AsyncSession, payload: LoginRequest) -> TokenResponse:
+        """Log in — check email verified, password valid."""
+        user = await session.execute(select(User).where(User.email == payload.email))
+        user = user.scalar()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials.",
+            )
+
+        if not user.is_verified:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account is deactivated.",
+                detail="Email not verified. Check your inbox for OTP.",
             )
 
-        subject = str(user.id)
-        return TokenResponse(
-            access_token=create_access_token(subject),
-            refresh_token=create_refresh_token(subject),
-        )
+        if not verify_password(payload.password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials.",
+            )
 
-    async def refresh(self, session: AsyncSession, refresh_token: str) -> TokenResponse:
-        user_id = decode_token(refresh_token, expected_type="refresh")
+        return await self.create_tokens(str(user.id))
+
+    async def create_tokens(self, user_id: str) -> TokenResponse:
+        """Create access token."""
+        access_token = create_access_token(user_id)
+        return TokenResponse(access_token=access_token)
+
+    async def get_current_user(self, session: AsyncSession, user_id: str):
+        """Get current user."""
+        from app.schemas.auth import UserResponse
+
         user = await session.get(User, uuid.UUID(user_id))
-        if not user or not user.is_active:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
-
-        return TokenResponse(
-            access_token=create_access_token(user_id),
-            refresh_token=create_refresh_token(user_id),
-        )
-
-    async def get_current_user(self, session: AsyncSession, user_id: str) -> UserResponse:
-        user = await session.get(User, uuid.UUID(user_id))
-        if not user or not user.is_active:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
         return UserResponse(**user.to_dict())
 
 

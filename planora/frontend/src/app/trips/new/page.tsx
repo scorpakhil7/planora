@@ -4,38 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { post } from "@/lib/api";
 import { checkFestivalSurge, SurgeResult } from "@/lib/festivals";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 type Destination = {
   city: string;
   country: string;
   order: number;
 };
-
-const BUDGET_PRESETS = [
-  { label: "Budget", sub: "₹5,000–₹15,000", value: 10000, icon: "🎒" },
-  { label: "Mid-range", sub: "₹15,000–₹40,000", value: 25000, icon: "🏨" },
-  { label: "Premium", sub: "₹40,000–₹1,00,000", value: 70000, icon: "✈️" },
-  { label: "Luxury", sub: "₹1,00,000+", value: 150000, icon: "👑" },
-];
-
-const DEPARTURE_TIMES = [
-  { label: "Early Morning", sub: "4:00 AM – 7:00 AM", value: "05:00", icon: "🌅" },
-  { label: "Morning", sub: "7:00 AM – 11:00 AM", value: "09:00", icon: "☀️" },
-  { label: "Afternoon", sub: "11:00 AM – 4:00 PM", value: "13:00", icon: "🌤️" },
-  { label: "Evening", sub: "4:00 PM – 9:00 PM", value: "17:00", icon: "🌆" },
-];
-
-const DARSHAN_TYPES = [
-  { label: "General Darshan", sub: "Free — longer queue (2–6 hrs)", value: "general", icon: "🙏" },
-  { label: "Special Entry", sub: "₹300/person — 1–2 hr queue", value: "special_entry", icon: "⭐" },
-  { label: "VIP Darshan", sub: "₹1,000+/person — minimal wait", value: "vip", icon: "👑" },
-];
-
-const PILGRIMAGE_ACCOMMODATION = [
-  { label: "Dharmashala", sub: "₹100–₹500/night — basic, near temple", value: "dharmashala", icon: "🛕" },
-  { label: "Budget Hotel", sub: "₹500–₹1,500/night", value: "budget_hotel", icon: "🏩" },
-  { label: "Regular Hotel", sub: "₹1,500+/night — more comfort", value: "hotel", icon: "🏨" },
-];
 
 function formatINR(amount: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -51,7 +26,7 @@ function calcDays(start: string, end: string): number {
   return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1);
 }
 
-function FestivalSurgeBanner({ surge }: { surge: SurgeResult }) {
+function FestivalSurgeBanner({ surge, t }: { surge: SurgeResult; t: (k: string) => string }) {
   if (!surge.detected) return null;
 
   const bgColor = surge.highestLevel === "high" ? "bg-red-50 border-red-200" : surge.highestLevel === "medium" ? "bg-orange-50 border-orange-200" : "bg-yellow-50 border-yellow-200";
@@ -63,7 +38,7 @@ function FestivalSurgeBanner({ surge }: { surge: SurgeResult }) {
     <div className={`rounded-2xl border p-4 space-y-3 ${bgColor}`}>
       <div className="flex items-center gap-2">
         <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${badgeColor}`}>{surgeLabel}</span>
-        <span className={`text-sm font-semibold ${textColor}`}>Festival travel detected!</span>
+        <span className={`text-sm font-semibold ${textColor}`}>{t("tripsNew.festivalDetected")}</span>
       </div>
       {surge.festivals.map((festival) => (
         <div key={festival.name} className="flex gap-3">
@@ -75,7 +50,7 @@ function FestivalSurgeBanner({ surge }: { surge: SurgeResult }) {
         </div>
       ))}
       <p className={`text-xs font-medium ${textColor} opacity-70 pt-1 border-t border-current border-opacity-20`}>
-        💡 Tip: Book trains and hotels immediately, or adjust dates to avoid the surge window.
+        {t("tripsNew.festivalTip")}
       </p>
     </div>
   );
@@ -83,6 +58,33 @@ function FestivalSurgeBanner({ surge }: { surge: SurgeResult }) {
 
 export default function NewTripPage() {
   const router = useRouter();
+  const { t } = useTranslation();
+
+  const BUDGET_PRESETS = [
+    { label: t("tripsNew.budgetBudgetLabel"), sub: "₹5,000–₹15,000", value: 10000, icon: "🎒" },
+    { label: t("tripsNew.budgetMidLabel"), sub: "₹15,000–₹40,000", value: 25000, icon: "🏨" },
+    { label: t("tripsNew.budgetPremiumLabel"), sub: "₹40,000–₹1,00,000", value: 70000, icon: "✈️" },
+    { label: t("tripsNew.budgetLuxuryLabel"), sub: "₹1,00,000+", value: 150000, icon: "👑" },
+  ];
+
+  const DEPARTURE_TIMES = [
+    { label: t("tripsNew.timeEarlyMorning"), sub: "4:00 AM – 7:00 AM", value: "05:00", icon: "🌅" },
+    { label: t("tripsNew.timeMorning"), sub: "7:00 AM – 11:00 AM", value: "09:00", icon: "☀️" },
+    { label: t("tripsNew.timeAfternoon"), sub: "11:00 AM – 4:00 PM", value: "13:00", icon: "🌤️" },
+    { label: t("tripsNew.timeEvening"), sub: "4:00 PM – 9:00 PM", value: "17:00", icon: "🌆" },
+  ];
+
+  const DARSHAN_TYPES = [
+    { label: t("tripsNew.darshanGeneral"), sub: t("tripsNew.darshanGeneralSub"), value: "general", icon: "🙏" },
+    { label: t("tripsNew.darshanSpecial"), sub: t("tripsNew.darshanSpecialSub"), value: "special_entry", icon: "⭐" },
+    { label: t("tripsNew.darshanVip"), sub: t("tripsNew.darshanVipSub"), value: "vip", icon: "👑" },
+  ];
+
+  const PILGRIMAGE_ACCOMMODATION = [
+    { label: t("tripsNew.stayDharmashala"), sub: t("tripsNew.stayDharmashalaSub"), value: "dharmashala", icon: "🛕" },
+    { label: t("tripsNew.stayBudgetHotel"), sub: t("tripsNew.stayBudgetHotelSub"), value: "budget_hotel", icon: "🏩" },
+    { label: t("tripsNew.stayRegularHotel"), sub: t("tripsNew.stayRegularHotelSub"), value: "hotel", icon: "🏨" },
+  ];
 
   // Mode
   const [mode, setMode] = useState<"regular" | "pilgrimage">("regular");
@@ -148,20 +150,20 @@ export default function NewTripPage() {
     setError("");
 
     if (!startDate || !endDate) {
-      setError("Please select both start and end dates.");
+      setError(t("tripsNew.errSelectDates"));
       return;
     }
     if (new Date(endDate) < new Date(startDate)) {
-      setError("End date must be after start date.");
+      setError(t("tripsNew.errEndAfterStart"));
       return;
     }
     const filledDests = destinations.filter((d) => d.city.trim());
     if (filledDests.length === 0) {
-      setError("Please add at least one destination.");
+      setError(t("tripsNew.errAddDestination"));
       return;
     }
     if (!fromCity.trim()) {
-      setError("Please enter your departure city.");
+      setError(t("tripsNew.errDepartureCity"));
       return;
     }
 
@@ -193,7 +195,7 @@ export default function NewTripPage() {
       });
       router.push(`/trips/${trip.id}`);
     } catch (err: any) {
-      setError(err.message || "Failed to create trip");
+      setError(err.message || t("tripsNew.errCreateFailed"));
       setLoading(false);
     }
   }
@@ -206,12 +208,10 @@ export default function NewTripPage() {
     <div className="max-w-2xl mx-auto space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">
-          {isPilgrimage ? "Plan a Pilgrimage" : "Plan a new trip"}
+          {isPilgrimage ? t("tripsNew.titlePilgrimage") : t("tripsNew.titleRegular")}
         </h1>
         <p className="text-gray-500 mt-1">
-          {isPilgrimage
-            ? "AI will plan only spiritual & religious places at your destination"
-            : "Fill in the details and let AI build your itinerary"}
+          {isPilgrimage ? t("tripsNew.subPilgrimage") : t("tripsNew.subRegular")}
         </p>
       </div>
 
@@ -226,7 +226,7 @@ export default function NewTripPage() {
               : "text-gray-500 hover:text-gray-700"
           }`}
         >
-          🗺️ Regular Trip
+          {t("tripsNew.modeRegular")}
         </button>
         <button
           type="button"
@@ -237,17 +237,16 @@ export default function NewTripPage() {
               : "text-gray-500 hover:text-gray-700"
           }`}
         >
-          🛕 Pilgrimage Mode
+          {t("tripsNew.modePilgrimage")}
         </button>
       </div>
 
       {/* Pilgrimage mode info banner */}
       {isPilgrimage && (
         <div className="bg-orange-50 border border-orange-200 rounded-2xl px-5 py-4 space-y-1">
-          <p className="text-sm font-semibold text-orange-700">🙏 Pilgrimage Mode is ON</p>
+          <p className="text-sm font-semibold text-orange-700">{t("tripsNew.pilgrimageBannerTitle")}</p>
           <p className="text-xs text-orange-600">
-            AI will only suggest temples, ghats, ashrams, and sacred sites — no regular tourist spots.
-            Includes darshan timings, queue tips, and prasad costs.
+            {t("tripsNew.pilgrimageBannerDesc")}
           </p>
         </div>
       )}
@@ -259,21 +258,21 @@ export default function NewTripPage() {
 
         {/* Trip Details */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-          <h2 className="font-semibold text-gray-800">Trip Details</h2>
+          <h2 className="font-semibold text-gray-800">{t("tripsNew.tripDetails")}</h2>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Trip name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("tripsNew.tripName")}</label>
             <input
               type="text" required value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={isPilgrimage ? "e.g. Tirupati Darshan 2026" : "e.g. Rajasthan Road Trip 2025"}
+              placeholder={isPilgrimage ? t("tripsNew.placeholderTripNamePilgrimage") : t("tripsNew.placeholderTripNameRegular")}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Travelling from</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("tripsNew.travellingFrom")}</label>
               <input
                 type="text" required value={fromCity}
                 onChange={(e) => setFromCity(e.target.value)}
@@ -282,25 +281,25 @@ export default function NewTripPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Number of travelers</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("tripsNew.numberOfTravelers")}</label>
               <div className="flex items-center gap-3 h-[50px]">
                 <button type="button" onClick={() => setPersons((p) => Math.max(1, p - 1))} className="w-10 h-10 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition">−</button>
                 <span className="text-lg font-semibold text-gray-900 w-8 text-center">{persons}</span>
                 <button type="button" onClick={() => setPersons((p) => Math.min(20, p + 1))} className="w-10 h-10 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition">+</button>
-                <span className="text-sm text-gray-400">{persons === 1 ? "traveler" : "travelers"}</span>
+                <span className="text-sm text-gray-400">{persons === 1 ? t("tripsNew.traveler") : t("tripsNew.travelers")}</span>
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Start date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("tripsNew.startDate")}</label>
               <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">End date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("tripsNew.endDate")}</label>
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
               />
@@ -310,22 +309,22 @@ export default function NewTripPage() {
           {totalDays > 0 && (
             <div className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 rounded-xl">
               <span className="text-indigo-600">🗓</span>
-              <span className="text-sm font-medium text-indigo-700">{totalDays} day{totalDays > 1 ? "s" : ""} trip</span>
-              <span className="text-xs text-indigo-400 ml-1">— days auto-calculated from your dates</span>
+              <span className="text-sm font-medium text-indigo-700">{totalDays} {totalDays > 1 ? t("tripsNew.daysTripSuffix") : t("tripsNew.dayTripSuffix")}</span>
+              <span className="text-xs text-indigo-400 ml-1">{t("tripsNew.daysAutoCalc")}</span>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Preferred departure time on Day 1</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t("tripsNew.preferredDeparture")}</label>
             <div className="grid grid-cols-2 gap-2">
-              {DEPARTURE_TIMES.map((t) => (
-                <button key={t.value} type="button" onClick={() => setDepartureTime(t.value)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left transition ${departureTime === t.value ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-gray-200 text-gray-600 hover:border-indigo-300 hover:bg-indigo-50"}`}
+              {DEPARTURE_TIMES.map((dt) => (
+                <button key={dt.value} type="button" onClick={() => setDepartureTime(dt.value)}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left transition ${departureTime === dt.value ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-gray-200 text-gray-600 hover:border-indigo-300 hover:bg-indigo-50"}`}
                 >
-                  <span>{t.icon}</span>
+                  <span>{dt.icon}</span>
                   <div>
-                    <p className="text-sm font-semibold">{t.label}</p>
-                    <p className="text-xs opacity-70">{t.sub}</p>
+                    <p className="text-sm font-semibold">{dt.label}</p>
+                    <p className="text-xs opacity-70">{dt.sub}</p>
                   </div>
                 </button>
               ))}
@@ -338,8 +337,8 @@ export default function NewTripPage() {
           <>
             {/* Darshan Type */}
             <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-6 space-y-4">
-              <h2 className="font-semibold text-gray-800">🙏 Darshan Preference</h2>
-              <p className="text-xs text-gray-400">AI will plan your temple visit based on your darshan type including queue time and cost.</p>
+              <h2 className="font-semibold text-gray-800">{t("tripsNew.darshanTitle")}</h2>
+              <p className="text-xs text-gray-400">{t("tripsNew.darshanDesc")}</p>
               <div className="space-y-2">
                 {DARSHAN_TYPES.map((d) => (
                   <button key={d.value} type="button" onClick={() => setDarshanType(d.value)}
@@ -358,8 +357,8 @@ export default function NewTripPage() {
 
             {/* Accommodation preference */}
             <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-6 space-y-4">
-              <h2 className="font-semibold text-gray-800">🏠 Stay Preference</h2>
-              <p className="text-xs text-gray-400">Pilgrims often prefer dharmashalas near the temple for early-morning darshan access.</p>
+              <h2 className="font-semibold text-gray-800">{t("tripsNew.stayTitle")}</h2>
+              <p className="text-xs text-gray-400">{t("tripsNew.stayDesc")}</p>
               <div className="space-y-2">
                 {PILGRIMAGE_ACCOMMODATION.map((a) => (
                   <button key={a.value} type="button" onClick={() => setPilgrimAccommodation(a.value)}
@@ -379,11 +378,11 @@ export default function NewTripPage() {
         )}
 
         {/* Festival Surge Alert */}
-        {surge.detected && <FestivalSurgeBanner surge={surge} />}
+        {surge.detected && <FestivalSurgeBanner surge={surge} t={t} />}
 
         {/* Budget */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-          <h2 className="font-semibold text-gray-800">Total Budget</h2>
+          <h2 className="font-semibold text-gray-800">{t("tripsNew.totalBudget")}</h2>
           <div className="grid grid-cols-2 gap-2">
             {BUDGET_PRESETS.map((preset) => (
               <button key={preset.label} type="button" onClick={() => handleBudgetPreset(preset.value)}
@@ -399,7 +398,7 @@ export default function NewTripPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Custom amount (₹)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("tripsNew.customAmount")}</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">₹</span>
               <input type="number" min={1000} value={budgetInput} onChange={(e) => handleBudgetInput(e.target.value)}
@@ -412,37 +411,35 @@ export default function NewTripPage() {
             <div className="flex gap-3">
               {totalDays > 0 && (
                 <div className="flex-1 bg-indigo-50 rounded-xl px-4 py-3 text-center">
-                  <p className="text-xs text-indigo-500 font-medium">Per day</p>
+                  <p className="text-xs text-indigo-500 font-medium">{t("tripsNew.perDay")}</p>
                   <p className="text-lg font-bold text-indigo-700">{formatINR(budgetPerDay)}</p>
                 </div>
               )}
               {persons > 1 && (
                 <div className="flex-1 bg-purple-50 rounded-xl px-4 py-3 text-center">
-                  <p className="text-xs text-purple-500 font-medium">Per person</p>
+                  <p className="text-xs text-purple-500 font-medium">{t("tripsNew.perPerson")}</p>
                   <p className="text-lg font-bold text-purple-700">{formatINR(budgetPerPerson)}</p>
                 </div>
               )}
               <div className="flex-1 bg-green-50 rounded-xl px-4 py-3 text-center">
-                <p className="text-xs text-green-500 font-medium">Total budget</p>
+                <p className="text-xs text-green-500 font-medium">{t("tripsNew.totalBudgetLabel")}</p>
                 <p className="text-lg font-bold text-green-700">{formatINR(budget)}</p>
               </div>
             </div>
           )}
-          <p className="text-xs text-gray-400">💡 AI picks best transport and plans activities within this budget</p>
+          <p className="text-xs text-gray-400">{t("tripsNew.budgetTip")}</p>
         </div>
 
         {/* Destinations */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-800">
-              {isPilgrimage ? "Pilgrimage Destinations" : "Destinations"}
+              {isPilgrimage ? t("tripsNew.pilgrimageDestinationsTitle") : t("tripsNew.destinationsTitle")}
             </h2>
-            <button type="button" onClick={addDestination} className="text-sm text-indigo-600 font-medium hover:text-indigo-700">+ Add destination</button>
+            <button type="button" onClick={addDestination} className="text-sm text-indigo-600 font-medium hover:text-indigo-700">{t("tripsNew.addDestination")}</button>
           </div>
           <p className="text-xs text-gray-400">
-            {isPilgrimage
-              ? "Enter the city/town with the temple or spiritual site (e.g. Tirupati, Varanasi, Shirdi)."
-              : "Days will be split equally across destinations based on your travel dates."}
+            {isPilgrimage ? t("tripsNew.destHintPilgrimage") : t("tripsNew.destHintRegular")}
           </p>
 
           <div className="space-y-3">
@@ -452,13 +449,13 @@ export default function NewTripPage() {
                 <input
                   type="text" required value={dest.city}
                   onChange={(e) => updateDestination(i, "city", e.target.value)}
-                  placeholder={isPilgrimage ? "e.g. Tirupati, Varanasi, Shirdi" : "City (e.g. Jaipur)"}
+                  placeholder={isPilgrimage ? t("tripsNew.cityPlaceholderPilgrimage") : t("tripsNew.cityPlaceholderRegular")}
                   className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
                 <input
                   type="text" value={dest.country}
                   onChange={(e) => updateDestination(i, "country", e.target.value)}
-                  placeholder="Country"
+                  placeholder={t("tripsNew.countryPlaceholder")}
                   className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
                 {destinations.length > 1 && (
@@ -471,13 +468,13 @@ export default function NewTripPage() {
 
         {/* Submit */}
         <div className="flex gap-3">
-          <button type="button" onClick={() => router.back()} className="px-6 py-3 text-gray-600 font-medium border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+          <button type="button" onClick={() => router.back()} className="px-6 py-3 text-gray-600 font-medium border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">{t("tripsNew.cancel")}</button>
           <button type="submit" disabled={loading}
             className={`flex-1 py-3 font-semibold rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white ${isPilgrimage ? "bg-orange-500 hover:bg-orange-600" : "bg-indigo-600 hover:bg-indigo-700"}`}
           >
             {loading
-              ? isPilgrimage ? "Planning pilgrimage..." : "Creating trip..."
-              : isPilgrimage ? "Plan Pilgrimage →" : "Create trip →"}
+              ? isPilgrimage ? t("tripsNew.planningPilgrimage") : t("tripsNew.creatingTrip")
+              : isPilgrimage ? t("tripsNew.planPilgrimageBtn") : t("tripsNew.createTripBtn")}
           </button>
         </div>
       </form>
