@@ -24,6 +24,8 @@ async def signup(payload: UserCreate, session: AsyncSession = Depends(get_db)):
             "message": "Check your email for a 6-digit verification code.",
             "email": result["email"],
             "is_verified": False,
+            "email_sent": result["email_sent"],
+            **({"dev_otp": result["dev_otp"]} if "dev_otp" in result else {}),
         }
     )
 
@@ -32,15 +34,21 @@ async def signup(payload: UserCreate, session: AsyncSession = Depends(get_db)):
 async def verify_otp(payload: VerifyOTPRequest, session: AsyncSession = Depends(get_db)):
     """Verify OTP and mark email as verified."""
     user = await auth_service.verify_otp(session, payload.email, payload.otp)
-    tokens = await auth_service.create_tokens(user.id)
+    tokens = await auth_service.create_tokens(str(user.id))
     return ok(tokens.model_dump())
 
 
 @router.post("/resend-otp")
 async def resend_otp(payload: ResendOTPRequest, session: AsyncSession = Depends(get_db)):
     """Resend OTP to email."""
-    await auth_service.resend_otp(session, payload.email)
-    return ok({"message": "OTP resent to your email."})
+    result = await auth_service.resend_otp(session, payload.email)
+    return ok(
+        {
+            "message": "OTP resent to your email.",
+            "email_sent": result["email_sent"],
+            **({"dev_otp": result["dev_otp"]} if "dev_otp" in result else {}),
+        }
+    )
 
 
 @router.post("/login")

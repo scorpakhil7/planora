@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.security import hash_password, verify_password, create_access_token
 from app.db.models.user import User
 from app.schemas.auth import UserCreate, LoginRequest, TokenResponse
@@ -40,13 +41,19 @@ class AuthService:
         user.preferences = {"otp": otp, "otp_expires": otp_expires}
         await session.flush()
 
-        # Send email
-        send_otp_email(user.email, otp, user.name)
+        email_sent = await send_otp_email(user.email, otp, user.name)
 
         # Commit
         await session.commit()
 
-        return {"email": user.email, "id": str(user.id)}
+        result = {
+            "email": user.email,
+            "id": str(user.id),
+            "email_sent": email_sent,
+        }
+        if not email_sent and settings.DEBUG:
+            result["dev_otp"] = otp
+        return result
 
     async def verify_otp(
         self, session: AsyncSession, email: str, otp: str
@@ -95,7 +102,7 @@ class AuthService:
 
         return user
 
-    async def resend_otp(self, session: AsyncSession, email: str) -> None:
+    async def resend_otp(self, session: AsyncSession, email: str) -> dict:
         """Resend OTP to email."""
         user = await session.execute(select(User).where(User.email == email))
         user = user.scalar()
@@ -118,10 +125,14 @@ class AuthService:
         user.preferences = {"otp": otp, "otp_expires": otp_expires}
         await session.flush()
 
-        # Send email
-        send_otp_email(user.email, otp, user.name)
+        email_sent = await send_otp_email(user.email, otp, user.name)
 
         await session.commit()
+
+        result = {"email_sent": email_sent}
+        if not email_sent and settings.DEBUG:
+            result["dev_otp"] = otp
+        return result
 
     async def login(self, session: AsyncSession, payload: LoginRequest) -> TokenResponse:
         """Log in — check email verified, password valid."""
